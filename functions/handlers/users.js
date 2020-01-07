@@ -117,25 +117,25 @@ const getUserDetails = (req, res) => {
       if (doc.exists) {
         userData.user = doc.data();
         return db
-          .collection("screams")
+          .collection("products")
           .where("userHandle", "==", req.params.handle)
-          .orderBy("createdAt", "desc")
+          // .orderBy("createdAt", "desc")
           .get();
       } else {
         return res.status(404).json({ errror: "User not found" });
       }
     })
     .then(data => {
-      userData.screams = [];
+      userData.products = [];
       data.forEach(doc => {
-        userData.screams.push({
+        userData.products.push({
           body: doc.data().body,
           createdAt: doc.data().createdAt,
           userHandle: doc.data().userHandle,
           userImage: doc.data().userImage,
           likeCount: doc.data().likeCount,
           commentCount: doc.data().commentCount,
-          screamId: doc.id
+          productId: doc.id
         });
       });
       return res.json(userData);
@@ -167,7 +167,7 @@ const getAuthenticatedUser = (req, res) => {
       return db
         .collection("notifications")
         .where("recipient", "==", req.user.handle)
-        .orderBy("createdAt", "desc")
+        // .orderBy("createdAt", "desc")
         .limit(10)
         .get();
     })
@@ -191,59 +191,7 @@ const getAuthenticatedUser = (req, res) => {
       return res.status(500).json({ error: err.code });
     });
 };
-// Upload a profile image for user
-const uploadImage = (req, res) => {
-  const BusBoy = require("busboy");
-  const path = require("path");
-  const os = require("os");
-  const fs = require("fs");
 
-  const busboy = new BusBoy({ headers: req.headers });
-
-  let imageToBeUploaded = {};
-  let imageFileName;
-
-  busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
-    console.log(fieldname, file, filename, encoding, mimetype);
-    if (mimetype !== "image/jpeg" && mimetype !== "image/png") {
-      return res.status(400).json({ error: "Wrong file type submitted" });
-    }
-    // my.image.png => ['my', 'image', 'png']
-    const imageExtension = filename.split(".")[filename.split(".").length - 1];
-    // 32756238461724837.png
-    imageFileName = `${Math.round(
-      Math.random() * 1000000000000
-    ).toString()}.${imageExtension}`;
-    const filepath = path.join(os.tmpdir(), imageFileName);
-    imageToBeUploaded = { filepath, mimetype };
-    file.pipe(fs.createWriteStream(filepath));
-  });
-  busboy.on("finish", () => {
-    admin
-      .storage()
-      .bucket()
-      .upload(imageToBeUploaded.filepath, {
-        resumable: false,
-        metadata: {
-          metadata: {
-            contentType: imageToBeUploaded.mimetype
-          }
-        }
-      })
-      .then(() => {
-        const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/${imageFileName}?alt=media`;
-        return db.doc(`/users/${req.user.handle}`).update({ imageUrl });
-      })
-      .then(() => {
-        return res.json({ message: "image uploaded successfully" });
-      })
-      .catch(err => {
-        console.error(err);
-        return res.status(500).json({ error: "something went wrong" });
-      });
-  });
-  busboy.end(req.rawBody);
-};
 
 const markNotificationsRead = (req, res) => {
   let batch = db.batch();
@@ -261,12 +209,32 @@ const markNotificationsRead = (req, res) => {
       return res.status(500).json({ error: err.code });
     });
 };
+// Delete a user
+const deleteUser = (req, res) => {
+  const document = db.doc(`/users/${req.params.productId}`);
+  console.log(document)
+  document
+    .get()
+    .then(doc => {
+      if (!doc.exists) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      document.delete();
+    })
+    .then(() => {
+      res.json({ message: "User deleted successfully" });
+    })
+    .catch(err => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
+};
 module.exports = {
   signup,
   login,
   markNotificationsRead,
-  uploadImage,
   getAuthenticatedUser,
   getUserDetails,
-  addUserDetails
+  addUserDetails,
+  deleteUser
 };
