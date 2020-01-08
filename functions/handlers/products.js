@@ -2,7 +2,7 @@ const { db } = require("../util/admin");
 
 exports.getAllProducts = (req, res) => {
   db.collection("products")
-    .orderBy("createdAt", desc)
+    // .orderBy("createdAt", desc)
     .get()
     .then(data => {
       let products = [];
@@ -25,14 +25,59 @@ exports.getAllProducts = (req, res) => {
     });
 };
 
+const convertCollectionsSnapshotToMap = collections => {
+  const transformedCollection = collections.docs.map(doc => {
+    const { title, items } = doc.data();
+
+    return {
+      routeName: encodeURI(title.toLowerCase()),
+      id: doc.id,
+      title,
+      items
+    };
+  });
+
+  return transformedCollection.reduce((accumulator, collection) => {
+    accumulator[collection.title.toLowerCase()] = collection;
+    return accumulator;
+  }, {});
+};
+exports.getAllCollections = (req, res) => {
+  const collectionRef = db.collection('collections');
+  collectionRef
+    // .orderBy("createdAt", desc)
+    .get()
+    .then(snapshot => {
+      const collectionsMap = convertCollectionsSnapshotToMap(snapshot);
+      console.log(collectionsMap)
+      // let products = [];
+      // data.forEach(doc => {
+      //   products.push({
+      //     productId: doc.id,
+      //     body: doc.data().body,
+      //     userHandle: doc.data().userHandle,
+      //     createdAt: doc.data().createdAt,
+      //     commentCount: doc.data().commentCount,
+      //     likedCount: doc.data().likedCount,
+      //     productImage: doc.data().productImage
+      //   });
+      // });
+      return res.json(collectionsMap);
+    })
+    .catch(error => {
+      console.error(error);
+      res.status(500).json({ error: error.code });
+    });
+};
 exports.postOneProduct = (req, res) => {
-  if (req.body.trim() === "") {
+  if (req.body.description.trim() === "") {
     return res.status(400).json({ body: "Body must not be empty" });
   }
   const newProduct = {
-    body: req.body.body,
+    name: req.body.name,
     userHandle: req.body.userHandle,
-    productImage: req.body.productImage,
+    productImage: req.body.imageUrl,
+    price: req.body.price,
     createdAt: new Date().toISOString(),
     likedCount: 0,
     commentCount: 0
@@ -63,7 +108,7 @@ exports.getProduct = (req, res) => {
       productData.productId = doc.id;
       return db
         .collection("products")
-        .orderBy("createdAt", "desc")
+        // .orderBy("createdAt", "desc")
         .where("productId", "==", req.params.productId)
         .get();
     })
@@ -81,18 +126,16 @@ exports.getProduct = (req, res) => {
 };
 // Comment on a comment
 exports.commentOnProduct = (req, res) => {
-  if (req.body.body.trim() === "")
+  if (req.body.description.trim() === "")
     return res.status(400).json({ comment: "Must not be empty" });
 
   const newComment = {
-    body: req.body.body,
+    description: req.body.description,
     createdAt: new Date().toISOString(),
-    screamId: req.params.productId,
+    productId: req.params.productId,
     userHandle: req.user.userHandle,
     productImage: req.user.imageUrl
   };
-  console.log(newComment);
-
   db.doc(`/products/${req.params.productId}`)
     .get()
     .then(doc => {
@@ -132,7 +175,7 @@ exports.likeProduct = (req, res) => {
         productData.productId = doc.id;
         return likeDocument.get();
       } else {
-        return res.status(404).json({ error: "Scream not found" });
+        return res.status(404).json({ error: "Product not found" });
       }
     })
     .then(data => {
@@ -226,56 +269,56 @@ exports.deleteProduct = (req, res) => {
       return res.status(500).json({ error: err.code });
     });
 };
-// Upload a profile product 
- exports.uploadImage = (req, res) => {
-    const BusBoy = require("busboy");
-    const path = require("path");
-    const os = require("os");
-    const fs = require("fs");
-  
-    const busboy = new BusBoy({ headers: req.headers });
-  
-    let imageToBeUploaded = {};
-    let imageFileName;
-  
-    busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
-      console.log(fieldname, file, filename, encoding, mimetype);
-      if (mimetype !== "image/jpeg" && mimetype !== "image/png") {
-        return res.status(400).json({ error: "Wrong file type submitted" });
-      }
-      // my.image.png => ['my', 'image', 'png']
-      const imageExtension = filename.split(".")[filename.split(".").length - 1];
-      // 32756238461724837.png
-      imageFileName = `${Math.round(
-        Math.random() * 1000000000000
-      ).toString()}.${imageExtension}`;
-      const filepath = path.join(os.tmpdir(), imageFileName);
-      imageToBeUploaded = { filepath, mimetype };
-      file.pipe(fs.createWriteStream(filepath));
-    });
-    busboy.on("finish", () => {
-      admin
-        .storage()
-        .bucket()
-        .upload(imageToBeUploaded.filepath, {
-          resumable: false,
+// Upload a profile product
+exports.uploadImage = (req, res) => {
+  const BusBoy = require("busboy");
+  const path = require("path");
+  const os = require("os");
+  const fs = require("fs");
+
+  const busboy = new BusBoy({ headers: req.headers });
+
+  let imageToBeUploaded = {};
+  let imageFileName;
+
+  busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
+    console.log(fieldname, file, filename, encoding, mimetype);
+    if (mimetype !== "image/jpeg" && mimetype !== "image/png") {
+      return res.status(400).json({ error: "Wrong file type submitted" });
+    }
+    // my.image.png => ['my', 'image', 'png']
+    const imageExtension = filename.split(".")[filename.split(".").length - 1];
+    // 32756238461724837.png
+    imageFileName = `${Math.round(
+      Math.random() * 1000000000000
+    ).toString()}.${imageExtension}`;
+    const filepath = path.join(os.tmpdir(), imageFileName);
+    imageToBeUploaded = { filepath, mimetype };
+    file.pipe(fs.createWriteStream(filepath));
+  });
+  busboy.on("finish", () => {
+    admin
+      .storage()
+      .bucket()
+      .upload(imageToBeUploaded.filepath, {
+        resumable: false,
+        metadata: {
           metadata: {
-            metadata: {
-              contentType: imageToBeUploaded.mimetype
-            }
+            contentType: imageToBeUploaded.mimetype
           }
-        })
-        .then(() => {
-          const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/${imageFileName}?alt=media`;
-          return db.doc(`/products/${req.params.productId}`).update({ imageUrl });
-        })
-        .then(() => {
-          return res.json({ message: "image uploaded successfully" });
-        })
-        .catch(err => {
-          console.error(err);
-          return res.status(500).json({ error: "something went wrong" });
-        });
-    });
-    busboy.end(req.rawBody);
-  };
+        }
+      })
+      .then(() => {
+        const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/${imageFileName}?alt=media`;
+        return db.doc(`/products/${req.params.productId}`).update({ imageUrl });
+      })
+      .then(() => {
+        return res.json({ message: "image uploaded successfully" });
+      })
+      .catch(err => {
+        console.error(err);
+        return res.status(500).json({ error: "something went wrong" });
+      });
+  });
+  busboy.end(req.rawBody);
+};

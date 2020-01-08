@@ -14,6 +14,7 @@ const {
   commentOnProduct,
   likeProduct,
   unlikeProduct,
+  getAllCollections,
   deleteProduct,
   uploadImage
 } = require('./handlers/products');
@@ -31,6 +32,7 @@ const {
 
 // Product routes
 app.get('/products', getAllProducts);
+app.get('/collections', getAllCollections);
 app.post('/product', FBAuth, postOneProduct);
 app.post('/product/image', FBAuth, uploadImage);
 app.get('/product/:productId', getProduct);
