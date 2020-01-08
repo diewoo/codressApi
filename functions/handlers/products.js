@@ -5,19 +5,47 @@ exports.getAllProducts = (req, res) => {
     // .orderBy("createdAt", desc)
     .get()
     .then(data => {
+      // let products = [];
       let products = [];
-      data.forEach(doc => {
+      data.forEach(doc => {        
         products.push({
           productId: doc.id,
-          body: doc.data().body,
+          // body: doc.data().body,
           userHandle: doc.data().userHandle,
           createdAt: doc.data().createdAt,
           commentCount: doc.data().commentCount,
           likedCount: doc.data().likedCount,
           productImage: doc.data().productImage
         });
+        const transformedCollection =()=> {
+          return {
+          title:doc.data().title,
+          products
+          }
+        };
+        return transformedCollection.reduce((accumulator, collection) => {
+          accumulator[collection.title.toLowerCase()] = collection;
+          return accumulator;
+        }, {});
+        // return {
+        //   routeName: encodeURI(doc.data().title.toLowerCase()),
+        //   id: doc.id,
+        //   title: doc.data().title,
+        //   items : products
+        // };
       });
-      return res.json(products);
+      // data.forEach(doc => {
+      //   products.push({
+      //     productId: doc.id,
+      //     body: doc.data().body,
+      //     userHandle: doc.data().userHandle,
+      //     createdAt: doc.data().createdAt,
+      //     commentCount: doc.data().commentCount,
+      //     likedCount: doc.data().likedCount,
+      //     productImage: doc.data().productImage
+      //   });
+      // });
+      // console.log(products)
     })
     .catch(error => {
       console.error(error);
@@ -42,26 +70,24 @@ const convertCollectionsSnapshotToMap = collections => {
     return accumulator;
   }, {});
 };
+// const addCollectionAndDocuments = async (collectionKey, objectsToAdd) => {
+//   const collectionRef = firestore.collection(collectionKey);
+
+//   const batch = firestore.batch();
+//   objectsToAdd.forEach(obj => {
+//     const newDocRef = collectionRef.doc();
+//     batch.set(newDocRef, obj);
+//   });
+
+//   return await batch.commit();
+// };
 exports.getAllCollections = (req, res) => {
-  const collectionRef = db.collection('collections');
+  const collectionRef = db.collection("collections");
   collectionRef
     // .orderBy("createdAt", desc)
     .get()
     .then(snapshot => {
       const collectionsMap = convertCollectionsSnapshotToMap(snapshot);
-      console.log(collectionsMap)
-      // let products = [];
-      // data.forEach(doc => {
-      //   products.push({
-      //     productId: doc.id,
-      //     body: doc.data().body,
-      //     userHandle: doc.data().userHandle,
-      //     createdAt: doc.data().createdAt,
-      //     commentCount: doc.data().commentCount,
-      //     likedCount: doc.data().likedCount,
-      //     productImage: doc.data().productImage
-      //   });
-      // });
       return res.json(collectionsMap);
     })
     .catch(error => {
@@ -69,25 +95,25 @@ exports.getAllCollections = (req, res) => {
       res.status(500).json({ error: error.code });
     });
 };
-exports.postOneProduct = (req, res) => {
+exports.postOneProduct = async (req, res) => {
   if (req.body.description.trim() === "") {
     return res.status(400).json({ body: "Body must not be empty" });
   }
-  const newProduct = {
-    name: req.body.name,
+  const newScream = {
+    description: req.body.description,
     userHandle: req.body.userHandle,
-    productImage: req.body.imageUrl,
-    price: req.body.price,
+    productImage: req.body.productImage,
     createdAt: new Date().toISOString(),
-    likedCount: 0,
+    likeCount: 0,
     commentCount: 0
   };
+
   db.collection("products")
-    .add(newProduct)
+    .add(newScream)
     .then(doc => {
-      const resProduct = newProduct;
-      resProduct.productId = doc.id;
-      res.json(resProduct);
+      const resScream = newScream;
+      resScream.productId = doc.id;
+      res.json(resScream);
     })
     .catch(err => {
       res.status(500).json({ error: "something went wrong" });
@@ -106,11 +132,13 @@ exports.getProduct = (req, res) => {
       }
       productData = doc.data();
       productData.productId = doc.id;
-      return db
-        .collection("products")
-        // .orderBy("createdAt", "desc")
-        .where("productId", "==", req.params.productId)
-        .get();
+      return (
+        db
+          .collection("products")
+          // .orderBy("createdAt", "desc")
+          .where("productId", "==", req.params.productId)
+          .get()
+      );
     })
     .then(data => {
       productData.comments = [];
